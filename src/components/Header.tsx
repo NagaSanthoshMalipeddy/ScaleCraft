@@ -1,9 +1,11 @@
-import { BookOpenText, Menu, Moon, Search, Sun } from 'lucide-react';
+import { BookOpenText, Menu, Moon, Sparkles, Search, Sun } from 'lucide-react';
 import { Logo } from './Logo';
 
 export function Header({
   theme,
   onTheme,
+  motion,
+  onMotion,
   onMenu,
   menuOpen,
   onSearch,
@@ -13,6 +15,8 @@ export function Header({
 }: {
   theme: 'light' | 'dark';
   onTheme: () => void;
+  motion: 'full' | 'reduce';
+  onMotion: () => void;
   onMenu: () => void;
   menuOpen: boolean;
   onSearch: () => void;
@@ -46,6 +50,15 @@ export function Header({
       </div>
       <button className="icon-btn outline-btn" onClick={onOutline} aria-label="Course outline" title="Course outline">
         <BookOpenText size={18} />
+      </button>
+      <button
+        className={`icon-btn motion-btn${motion === 'reduce' ? ' off' : ''}`}
+        onClick={onMotion}
+        aria-pressed={motion === 'full'}
+        aria-label={motion === 'full' ? 'Reduce motion' : 'Turn animations on'}
+        title={motion === 'full' ? 'Animations on — click to reduce motion' : 'Animations reduced — click to turn on'}
+      >
+        <Sparkles size={18} />
       </button>
       <button className="icon-btn" onClick={onTheme} aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}>
         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

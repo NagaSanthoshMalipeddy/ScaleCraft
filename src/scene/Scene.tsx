@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Flow, FlowKind, Scene as SceneT, SceneLink, SceneNode } from '../types';
-import { TAG_OFFSET, TOP_OFFSET, type Bounds } from './layout';
+import { blendBounds, useCamera } from './camera';
+import { sceneBounds, TAG_OFFSET, TOP_OFFSET, type Bounds } from './layout';
 import { usePresence } from './presence';
 import { DownBadge, Meter, NodeShape, Pill } from './shapes';
 import { nodeRadius, nodeScale, pointAt, polyD, polyLength, routeLink, toScreen, trim, type Pt } from './geom';
@@ -51,14 +52,14 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
 
   useEffect(() => {
     // Hold traffic briefly so packets start once the new layout has settled.
-    elapsed.current = -0.45;
+    elapsed.current = -0.9;
   }, [resetKey]);
 
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
+    let last = -1;
     const tick = (now: number) => {
-      const dt = Math.min(0.1, (now - last) / 1000);
+      const dt = last < 0 ? 0 : Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
       if (!pausedRef.current) elapsed.current += dt;
       const t = elapsed.current;
@@ -93,7 +94,7 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
             opacity = 0;
           }
           const p = pointAt(f.pts, d);
-          if (local < 0.2) opacity *= local / 0.2;
+          if (local < 0.35) opacity *= local / 0.35;
           el.setAttribute('cx', p.x.toFixed(1));
           el.setAttribute('cy', p.y.toFixed(1));
           el.setAttribute('class', `pk pk-${kind}${blocked ? ' pk-blocked' : ''}`);
@@ -128,7 +129,17 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
 type Vars = CSSProperties & Record<`--${string}`, string>;
 
 const at = (p: Pt): Vars => ({ transform: `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)` });
-const stagger = (order: number, base = 0, step = 70): Vars => ({ '--d': `${base + Math.min(order, 10) * step}ms` });
+/** Fraction of the way the camera leans from the whole-lesson framing towards the current step's content. */
+const CAMERA_FOCUS = 0.3;
+
+/**
+ * Enter delay for an element: a base offset for its layer (nodes → links → labels) plus a left-to-right sweep,
+ * so new parts of the system appear in the direction traffic flows. Depends only on position, so it never
+ * changes for an element that persists between steps.
+ */
+const sweep = (x: number, b: Bounds, base: number, spread = 360): Vars => ({
+  '--d': `${Math.round(base + Math.max(0, Math.min(1, (x - b.x) / b.w)) * spread)}ms`,
+});
 
 interface LinkLabel {
   key: string;
@@ -223,10 +234,17 @@ export function SceneView({
   const overlayP = usePresence(overlays, (o) => o.key);
   const noteP = usePresence(notes, (n) => `note:${n.text}:${n.at.join(',')}`);
 
+  const camera = useMemo(() => blendBounds(bounds, sceneBounds([scene]), CAMERA_FOCUS), [bounds, scene]);
+  const svgRef = useRef<SVGSVGElement>(null);
+  useCamera(svgRef, camera);
+  // The camera hook owns the viewBox after mount; React only sets the initial value.
+  const [initialViewBox] = useState(() => `${camera.x} ${camera.y} ${camera.w} ${camera.h}`);
+
   return (
     <svg
+      ref={svgRef}
       className="scene"
-      viewBox={`${bounds.x} ${bounds.y} ${bounds.w} ${bounds.h}`}
+      viewBox={initialViewBox}
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={label}
@@ -251,7 +269,7 @@ export function SceneView({
       </defs>
 
       <g className="links">
-        {linkP.map(({ key, item: { link, d }, exiting, order }) => {
+        {linkP.map(({ key, item: { link, d, mid }, exiting }) => {
           const tone = link.tone ?? (link.dashed ? 'muted' : 'ink');
           const arrow = link.arrow ?? 'end';
           return (
@@ -259,7 +277,7 @@ export function SceneView({
               key={key}
               d={d}
               pathLength={link.dashed ? undefined : 1}
-              style={stagger(order, 260, 45)}
+              style={sweep(mid.x, bounds, 280)}
               className={`link link-${tone}${link.dashed ? ' dashed' : ' draw'}${exiting ? ' out' : ''}`}
               markerEnd={arrow !== 'none' ? `url(#arrow-${tone})` : undefined}
               markerStart={arrow === 'both' ? `url(#arrow-${tone})` : undefined}
@@ -271,12 +289,13 @@ export function SceneView({
       <Packets flows={flows} paused={paused} resetKey={resetKey} />
 
       <g className="nodes">
-        {nodeP.map(({ key, item: n, exiting, order }) => {
+        {nodeP.map(({ key, item: n, exiting }) => {
           const tone = n.status === 'down' ? 'gray' : n.tone ?? defaultTone(n);
           const s = nodeScale(n);
+          const p = toScreen(n.at);
           return (
-            <g key={key} className="slide" style={at(toScreen(n.at))}>
-              <g className={`node tone-${tone} status-${n.status ?? 'ok'} ${exiting ? 'out' : 'pop'}`} style={stagger(order)}>
+            <g key={key} className="slide" style={at(p)}>
+              <g className={`node tone-${tone} status-${n.status ?? 'ok'} ${exiting ? 'out' : 'pop'}`} style={sweep(p.x, bounds, 60)}>
                 <ellipse className="ground" cx={0} cy={TAG_OFFSET[n.kind] * 0.55 * s} rx={70 * s} ry={18 * s} />
                 {n.status === 'hot' && <ellipse className="hot-ring" cx={0} cy={TAG_OFFSET[n.kind] * 0.45 * s} rx={78 * s} ry={34 * s} />}
                 <NodeShape n={n} />
@@ -287,18 +306,18 @@ export function SceneView({
       </g>
 
       <g className="labels">
-        {labelP.map(({ key, item, exiting, order }) => (
+        {labelP.map(({ key, item, exiting }) => (
           <g key={key} className="slide" style={at(item.mid)}>
-            <g className={exiting ? 'out' : 'fade-in'} style={stagger(order, 380, 40)}>
+            <g className={exiting ? 'out' : 'fade-in'} style={sweep(item.mid.x, bounds, 560)}>
               <Pill x={0} y={0} text={item.text} size={11.5} tone={item.bad ? 'bad' : 'ink'} />
             </g>
           </g>
         ))}
-        {overlayP.map(({ key, item: o, exiting, order }) => (
+        {overlayP.map(({ key, item: o, exiting }) => (
           <g key={key} className="slide" style={at(o.p)}>
             <g
               className={`${exiting ? 'out' : o.kind === 'down' ? 'pop' : 'fade-in'}${o.kind === 'tag' && o.dim ? ' dim' : ''}`}
-              style={stagger(order, 300, 45)}
+              style={sweep(o.p.x, bounds, 440)}
             >
               {o.kind === 'tag' && <Pill x={0} y={o.y} text={o.text} icon={o.icon} size={12.5} bold />}
               {o.kind === 'meter' && <Meter x={0} y={o.y} value={o.value} />}
@@ -306,8 +325,8 @@ export function SceneView({
             </g>
           </g>
         ))}
-        {noteP.map(({ key, item: note, exiting, order }) => (
-          <g key={key} className={exiting ? 'out' : 'fade-in'} style={stagger(order, 450, 80)}>
+        {noteP.map(({ key, item: note, exiting }) => (
+          <g key={key} className={exiting ? 'out' : 'fade-in'} style={sweep(toScreen(note.at).x, bounds, 660, 300)}>
             <Pill x={toScreen(note.at).x} y={toScreen(note.at).y} text={note.text} icon={note.icon} size={12} tone={note.tone ?? 'ink'} />
           </g>
         ))}

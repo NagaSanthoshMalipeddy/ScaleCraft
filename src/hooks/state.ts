@@ -27,6 +27,21 @@ export function useHashRoute(): [Route, (lessonId: string, step?: number) => voi
 
 type Theme = 'light' | 'dark';
 
+export type Motion = 'full' | 'reduce';
+
+export function useMotion(): [Motion, () => void] {
+  const [motion, setMotion] = useState<Motion>(() => (document.documentElement.dataset.motion === 'reduce' ? 'reduce' : 'full'));
+  useEffect(() => {
+    document.documentElement.dataset.motion = motion;
+    try {
+      localStorage.setItem('scalecraft.motion', motion);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [motion]);
+  return [motion, () => setMotion((m) => (m === 'reduce' ? 'full' : 'reduce'))];
+}
+
 export function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'));
   useEffect(() => {

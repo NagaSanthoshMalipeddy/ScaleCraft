@@ -4,12 +4,13 @@ import { LessonView } from './components/LessonView';
 import { Outline } from './components/Outline';
 import { SearchModal } from './components/SearchModal';
 import { Sidebar } from './components/Sidebar';
-import { lastVisited, rememberLast, useHashRoute, useProgress, useTheme } from './hooks/state';
+import { lastVisited, rememberLast, useHashRoute, useMotion, useProgress, useTheme } from './hooks/state';
 import { allLessons, findLesson } from './lessons';
 
 export default function App() {
   const [route, go] = useHashRoute();
   const [theme, toggleTheme] = useTheme();
+  const [motion, toggleMotion] = useMotion();
   const [progress, mark, resetProgress] = useProgress();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -60,6 +61,8 @@ export default function App() {
       <Header
         theme={theme}
         onTheme={toggleTheme}
+        motion={motion}
+        onMotion={toggleMotion}
         onMenu={() => setMenuOpen((o) => !o)}
         menuOpen={menuOpen}
         onSearch={() => setSearchOpen(true)}

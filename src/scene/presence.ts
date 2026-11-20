@@ -57,28 +57,33 @@ export function usePresence<T>(items: readonly T[], keyOf: (t: T) => string, exi
   return current.list;
 }
 
-const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /** Smoothly animates a number towards `target`. */
-export function useTween(target: number, ms = 650): number {
+export function useTween(target: number, ms = 950, delayMs = 250): number {
   const [state, setState] = useState({ from: target, to: target, value: target });
   if (state.to !== target) setState({ from: state.value, to: target, value: state.value });
 
   useEffect(() => {
     if (state.value === state.to) return;
-    const start = performance.now();
+    if (document.documentElement.dataset.motion === 'reduce') {
+      const to = state.to;
+      const raf = requestAnimationFrame(() => setState((s) => (s.to === to ? { ...s, value: to } : s)));
+      return () => cancelAnimationFrame(raf);
+    }
+    const start = performance.now() + delayMs;
     const from = state.from;
     const to = state.to;
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / ms);
-      setState((s) => (s.to === to ? { ...s, value: from + (to - from) * ease(t) } : s));
+      const t = Math.max(0, Math.min(1, (now - start) / ms));
+      setState((s) => (s.to === to ? { ...s, value: from + (to - from) * easeInOut(t) } : s));
       if (t < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.to, state.from, ms]);
+  }, [state.to, state.from, ms, delayMs]);
 
   return state.value;
 }

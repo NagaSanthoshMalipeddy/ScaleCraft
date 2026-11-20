@@ -11,6 +11,9 @@
         var t = localStorage.getItem('scalecraft.theme');
         if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme = t;
+        // Animation is the core of each lesson, so it's on unless the user turns it off in the header.
+        // (Remote desktop / dev-box sessions often report prefers-reduced-motion even when nobody asked for it.)
+        document.documentElement.dataset.motion = localStorage.getItem('scalecraft.motion') || 'full';
       } catch (e) {}
     </script>
   </head>

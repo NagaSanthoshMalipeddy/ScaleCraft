@@ -646,13 +646,16 @@ code {
   font-size: 17px;
   font-weight: 800;
   line-height: 1.2;
-  animation: tick 0.5s ease;
+  animation: tick 0.65s 0.15s var(--ease-out) both;
 }
 @keyframes tick {
   from {
     transform: translateY(6px);
     opacity: 0;
   }
+}
+.metric::before {
+  transition: background 0.6s var(--ease-in-out);
 }
 .scene-wrap {
   height: clamp(440px, 60vh, 720px);
@@ -680,7 +683,7 @@ code {
   color: var(--muted);
 }
 .legend-item {
-  animation: fade 0.4s ease both;
+  animation: fade 0.6s 0.2s var(--ease-in-out) both;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -750,11 +753,6 @@ code {
 }
 .scene .f3 {
   fill: var(--f3);
-}
-.scene .f1,
-.scene .f2,
-.scene .f3 {
-  transition: fill 0.5s;
 }
 .scene .sheen {
   fill: rgba(255, 255, 255, 0.18);
@@ -912,7 +910,7 @@ code {
 }
 
 .scene .node {
-  transition: opacity 0.4s;
+  transition: opacity 0.6s var(--ease-in-out);
 }
 .scene .node.status-down {
   opacity: 0.75;
@@ -930,40 +928,60 @@ code {
   animation: pulse 1.3s ease-out infinite;
 }
 @keyframes pulse {
-  from {
-    opacity: 0.85;
+  0% {
+    opacity: 0;
     transform: scale(0.82);
   }
-  to {
+  18% {
+    opacity: 0.8;
+  }
+  100% {
     opacity: 0;
     transform: scale(1.22);
   }
 }
 
-/* ---- Step-to-step transitions ---- */
+/* ---- Step-to-step transitions ----
+   One motion language: soft ease-out arrivals, gentle ease-in departures, ease-in-out moves.
+   No overshoot, so everything settles cleanly into place. */
+:root {
+  --ease-out: cubic-bezier(0.22, 0.75, 0.25, 1);
+  --ease-in: cubic-bezier(0.55, 0, 0.8, 0.35);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
 /* Persisting elements glide to their new position. */
 .scene .slide {
-  transition: transform 0.6s cubic-bezier(0.3, 0.8, 0.25, 1);
+  transition: transform 0.9s var(--ease-in-out);
 }
-/* New elements pop / fade in, staggered via --d. */
+/* New nodes settle down into place with a subtle scale, swept left → right via --d. */
 .scene .pop {
   transform-box: fill-box;
-  transform-origin: 50% 70%;
-  animation: pop-in 0.55s var(--d, 0ms) cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  transform-origin: 50% 75%;
+  animation: settle-in 0.8s var(--d, 0ms) var(--ease-out) both;
 }
-@keyframes pop-in {
+@keyframes settle-in {
   from {
     opacity: 0;
-    transform: translateY(-16px) scale(0.82);
+    transform: translateY(-12px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
+/* Labels, tags and notes drift up and fade in once their nodes have landed. */
 .scene .fade-in {
-  animation: rise-in 0.45s var(--d, 150ms) cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: rise-in 0.65s var(--d, 300ms) var(--ease-out) both;
 }
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(7px) scale(0.97);
   }
 }
 @keyframes fade {
@@ -971,33 +989,42 @@ code {
     opacity: 0;
   }
 }
-/* Removed elements shrink and fade out before they are unmounted. */
+/* Removed elements ease away (slightly sinking and shrinking) before unmounting. */
 .scene .out {
   transform-box: fill-box;
-  transform-origin: 50% 70%;
+  transform-origin: 50% 75%;
   pointer-events: none;
-  animation: pop-out 0.36s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  animation: settle-out 0.38s var(--ease-in) forwards;
 }
-@keyframes pop-out {
+@keyframes settle-out {
   to {
     opacity: 0;
-    transform: translateY(8px) scale(0.86);
+    transform: translateY(6px) scale(0.94);
   }
 }
 /* Text and icons inside a persisting node cross-fade when they change. */
 .scene .swap {
-  animation: fade 0.45s ease both;
+  animation: fade 0.6s var(--ease-in-out) both;
 }
-/* Queue items and crowd members slide in and out of their slots. */
+/* Queue items and crowd members ease in and out of their slots. */
 .scene .slot {
   transition:
-    opacity 0.35s ease,
-    transform 0.4s cubic-bezier(0.2, 1.3, 0.4, 1);
+    opacity 0.5s var(--ease-in-out),
+    transform 0.6s var(--ease-out);
 }
 .scene .slot.off {
   opacity: 0;
-  transform: translateY(-14px);
+  transform: translateY(-10px);
   transition-delay: 0ms !important;
+  transition-timing-function: var(--ease-in);
+}
+.scene .hot-ring {
+  animation: pulse 1.7s 0.5s var(--ease-out) infinite both;
+}
+.scene .f1,
+.scene .f2,
+.scene .f3 {
+  transition: fill 0.7s var(--ease-in-out);
 }
 
 /* links */
@@ -1007,8 +1034,8 @@ code {
   stroke-linecap: round;
   stroke-linejoin: round;
   transition:
-    stroke 0.4s,
-    d 0.6s cubic-bezier(0.3, 0.8, 0.25, 1);
+    stroke 0.6s var(--ease-in-out),
+    d 0.9s var(--ease-in-out);
 }
 .scene .link-ink {
   stroke: var(--ink);
@@ -1026,7 +1053,7 @@ code {
   stroke-dasharray: 6 6;
   stroke-width: 2;
   animation:
-    fade 0.5s var(--d, 0ms) ease both,
+    fade 0.7s var(--d, 0ms) var(--ease-in-out) both,
     march 1.2s linear infinite;
 }
 @keyframes march {
@@ -1037,15 +1064,22 @@ code {
 .scene .link.draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: draw 0.7s var(--d, 100ms) ease both;
+  animation: draw 0.85s var(--d, 280ms) var(--ease-in-out) both;
 }
 @keyframes draw {
+  /* Arrowheads stay hidden until the stroke reaches them, then land with it. */
   0% {
     stroke-dashoffset: 1;
     opacity: 0;
+    marker-start: none;
+    marker-end: none;
   }
-  12% {
+  15% {
     opacity: 1;
+  }
+  88% {
+    marker-start: none;
+    marker-end: none;
   }
   100% {
     stroke-dashoffset: 0;
@@ -1054,7 +1088,7 @@ code {
 }
 .scene .link.out {
   stroke-dashoffset: 0;
-  animation: fade-out 0.32s ease forwards;
+  animation: fade-out 0.38s var(--ease-in) forwards;
 }
 @keyframes fade-out {
   to {
@@ -1291,12 +1325,27 @@ code {
 }
 .step-body {
   flex: 1;
-  animation: slide 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+/* Narrative panel: each block drifts in, gently staggered, in step with the diagram. */
+.step-body > * {
+  animation: slide 0.7s var(--ease-out) both;
+}
+.step-body > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.step-body > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.step-body > :nth-child(4) {
+  animation-delay: 180ms;
+}
+.step-body > :nth-child(n + 5) {
+  animation-delay: 240ms;
 }
 @keyframes slide {
   from {
     opacity: 0;
-    transform: translateX(14px);
+    transform: translateX(12px);
   }
 }
 .step-body h3 {
@@ -1773,12 +1822,20 @@ code {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.motion-btn.off {
+  color: var(--muted-2);
+}
+.motion-btn.off svg {
+  opacity: 0.55;
+}
+
+/* Reduced motion is an in-app choice (header toggle); see index.html for the default. */
+:root[data-motion='reduce'] *,
+:root[data-motion='reduce'] *::before,
+:root[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
 }
