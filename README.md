@@ -1,5 +1,7 @@
 # Scalecraft
 
+**Live: https://nagasanthoshmalipeddy.github.io/ScaleCraft/**
+
 System design, animated. Each lesson starts with a real problem and adds one idea per step, while an isometric diagram shows traffic flowing, servers heating up and metrics changing.
 
 - **40 lessons · 9 modules · 313 animated steps** — Foundations, Scaling, Data & Storage, Communication, Reliability, Architecture, Security, Shipping, and Whole Systems capstones (URL shortener, news feed, chat).
@@ -32,6 +34,8 @@ npm run check:lessons  # layout checker for every lesson diagram
 URLs are shareable: `#/<lesson-id>/<step>`, e.g. `#/caching/4`.
 
 ## Deploy
+
+**This repo deploys itself:** every push to `main` runs [.github/workflows/deploy.yml](.github/workflows/deploy.yml) (lesson layout check → build → publish) to GitHub Pages at https://nagasanthoshmalipeddy.github.io/ScaleCraft/.
 
 It's a fully static site — no server, database, API or environment variables. `npm run build` writes everything to `dist/` (about 770 KB: one HTML file, one JS bundle, one CSS file, fonts, favicon). Upload that folder to any static host:
 
