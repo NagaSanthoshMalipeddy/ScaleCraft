@@ -31,6 +31,15 @@ npm run check:lessons  # layout checker for every lesson diagram
 
 URLs are shareable: `#/<lesson-id>/<step>`, e.g. `#/caching/4`.
 
+## Deploy
+
+It's a fully static site — no server, database, API or environment variables. `npm run build` writes everything to `dist/` (about 770 KB: one HTML file, one JS bundle, one CSS file, fonts, favicon). Upload that folder to any static host:
+
+- **GitHub Pages / Netlify / Cloudflare Pages / Vercel:** build command `npm run build`, output directory `dist`.
+- **Any web server or bucket:** copy the contents of `dist/` (nginx, Apache, S3, an internal file share served over HTTP…).
+
+Asset paths are relative and routing uses the URL hash, so it works from a sub-path (e.g. `https://you.github.io/scalecraft/`) and needs no rewrite rules. It does need to be served over HTTP(S); opening `dist/index.html` straight from disk won't load the JS module. Progress and settings live in each visitor's `localStorage`.
+
 ## How it's built
 
 React 19 + TypeScript + Vite, hand-drawn SVG, no chart or animation libraries.
