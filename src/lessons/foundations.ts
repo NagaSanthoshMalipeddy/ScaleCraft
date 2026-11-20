@@ -9,11 +9,11 @@ const rq = cast({
   db: { kind: 'db', at: [5.5, -2], label: 'database', icon: Layers },
 });
 
-const url = { at: [-4.5, -1.1] as [number, number], text: 'https://bakery.example', icon: Globe };
+const url = { at: [-4.5, -1.9] as [number, number], text: 'https://bakery.example', icon: Globe };
 
 export const requestJourney: Lesson = {
   id: 'request-journey',
-  title: 'The Life of a Request',
+  title: 'How a Request Travels',
   blurb: 'Press Enter on a URL and follow every hop — then find out where the milliseconds actually go.',
   minutes: 9,
   level: 'Beginner',
@@ -57,7 +57,7 @@ export const requestJourney: Lesson = {
       changes: [{ sign: '+', text: 'DNS resolver' }, { sign: '+', text: 'Lookup: 24 ms' }],
       scene: {
         nodes: rq('you', 'dns'),
-        links: [L('you', 'dns', { dashed: true, arrow: 'both', label: 'A? bakery.example' })],
+        links: [L('you', 'dns', { dashed: true, arrow: 'both', label: 'lookup' })],
         flows: [F(['you', 'dns'], { ret: true })],
         notes: [url],
       },

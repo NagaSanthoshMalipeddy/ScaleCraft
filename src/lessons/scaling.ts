@@ -357,7 +357,7 @@ const cd = cast({
 
 export const cdn: Lesson = {
   id: 'cdn',
-  title: 'Content Delivery Networks',
+  title: 'Content Delivery',
   blurb: 'Copy what everyone downloads to servers near your users — and stop fighting the speed of light.',
   minutes: 8,
   level: 'Beginner',

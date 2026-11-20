@@ -290,7 +290,7 @@ export const sharding: Lesson = {
       changes: [{ sign: '+', text: 'Shard 4' }, { sign: '~', text: 'Rebalancing data' }],
       scene: {
         nodes: sh('app', ['router', { icon: Hash, sub: 'ring' }], ['s1', { meter: 30 }], ['s2', { meter: 30 }], ['s3', { meter: 30 }], ['s4', { meter: 20 }]),
-        links: [...shLinks, L('router', 's4'), L('s3', 's4', { dashed: true, label: 'move ¼', elbow: false })],
+        links: [...shLinks, L('router', 's4'), L('s3', 's4', { dashed: true, elbow: false })],
         flows: [F(['app', 'router', 's4'], { kind: 'data', delay: 0.3 }), F(['app', 'router', 's1'], { kind: 'data', delay: 0.9 }), F(['s3', 's4'], { kind: 'event', n: 2 })],
         notes: [{ at: [-3.6, 4.5], text: 'mod N: ~75% keys move', tone: 'bad' }, { at: [-3.6, 5.5], text: 'consistent: ~25% move', tone: 'good' }],
       },

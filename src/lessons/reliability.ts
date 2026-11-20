@@ -11,7 +11,7 @@ const rl = cast({
   script: { kind: 'cube', at: [-5.5, 3.5], label: 'Script', sub: 'runaway', icon: Bot, tone: 'rose' },
   limiter: { kind: 'cube', at: [-2, 0], label: 'Limiter', icon: Gauge, tone: 'green' },
   api: { kind: 'cube', at: [2, 0], label: 'API', icon: Server, tone: 'blue' },
-  store: { kind: 'cube', at: [1.5, -3.5], label: 'Counters', sub: 'in-memory', icon: Zap, tone: 'orange', size: 'sm' },
+  store: { kind: 'cube', at: [1.5, -3.5], label: 'Store', sub: 'counters', icon: Zap, tone: 'orange', size: 'sm' },
 });
 
 export const rateLimiting: Lesson = {
@@ -139,7 +139,7 @@ const tr = cast({
   users: { kind: 'crowd', at: [-6.5, 0], tag: 'shoppers', tagIcon: Users, items: 5 },
   checkout: { kind: 'cube', at: [-2.5, 0], label: 'Checkout', icon: ShoppingCart, tone: 'blue' },
   payments: { kind: 'cube', at: [1.5, 0], label: 'Payments', icon: CreditCard, tone: 'yellow' },
-  bank: { kind: 'cube', at: [5.5, 0], label: 'Bank', sub: 'card network', icon: Landmark, tone: 'violet' },
+  bank: { kind: 'cube', at: [5.5, 0], label: 'Bank', sub: 'network', icon: Landmark, tone: 'violet' },
 });
 
 const trLinks = [L('users', 'checkout'), L('checkout', 'payments'), L('payments', 'bank')];
