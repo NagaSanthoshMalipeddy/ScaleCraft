@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { Flow, FlowKind, Scene as SceneT, SceneLink, SceneNode } from '../types';
 import { TAG_OFFSET, TOP_OFFSET, type Bounds } from './layout';
+import { usePresence } from './presence';
 import { DownBadge, Meter, NodeShape, Pill } from './shapes';
 import { nodeRadius, nodeScale, pointAt, polyD, polyLength, routeLink, toScreen, trim, type Pt } from './geom';
 
@@ -49,7 +50,8 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
   }, [paused]);
 
   useEffect(() => {
-    elapsed.current = 0;
+    // Hold traffic briefly so packets start once the new layout has settled.
+    elapsed.current = -0.45;
   }, [resetKey]);
 
   useEffect(() => {
@@ -91,6 +93,7 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
             opacity = 0;
           }
           const p = pointAt(f.pts, d);
+          if (local < 0.2) opacity *= local / 0.2;
           el.setAttribute('cx', p.x.toFixed(1));
           el.setAttribute('cy', p.y.toFixed(1));
           el.setAttribute('class', `pk pk-${kind}${blocked ? ' pk-blocked' : ''}`);
@@ -121,6 +124,25 @@ function Packets({ flows, paused, resetKey }: { flows: BuiltFlow[]; paused: bool
     </g>
   );
 }
+
+type Vars = CSSProperties & Record<`--${string}`, string>;
+
+const at = (p: Pt): Vars => ({ transform: `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)` });
+const stagger = (order: number, base = 0, step = 70): Vars => ({ '--d': `${base + Math.min(order, 10) * step}ms` });
+
+interface LinkLabel {
+  key: string;
+  text: string;
+  mid: Pt;
+  bad: boolean;
+}
+
+type Overlay =
+  | { key: string; kind: 'tag'; p: Pt; y: number; text: string; icon?: SceneNode['tagIcon']; dim: boolean }
+  | { key: string; kind: 'meter'; p: Pt; y: number; value: number }
+  | { key: string; kind: 'down'; p: Pt; x: number; y: number };
+
+const nodeKey = (n: SceneNode) => `${n.id}|${n.kind}|${n.size ?? 'md'}`;
 
 export function SceneView({
   scene,
@@ -172,6 +194,35 @@ export function SceneView({
     [scene],
   );
 
+  const linkLabels = useMemo<LinkLabel[]>(
+    () =>
+      links
+        .filter((l) => l.link.label)
+        .map((l) => ({ key: `${l.key}:${l.link.label}`, text: l.link.label!, mid: l.mid, bad: l.link.tone === 'bad' })),
+    [links],
+  );
+
+  const overlays = useMemo<Overlay[]>(() => {
+    const out: Overlay[] = [];
+    for (const n of scene.nodes) {
+      const p = toScreen(n.at);
+      const s = nodeScale(n);
+      const tag = n.tag ?? (n.kind !== 'cube' ? n.label : undefined);
+      if (tag) out.push({ key: `tag:${n.id}:${tag}`, kind: 'tag', p, y: TAG_OFFSET[n.kind] * s, text: tag, icon: n.tagIcon, dim: n.status === 'dim' });
+      if (n.meter !== undefined) out.push({ key: `meter:${n.id}`, kind: 'meter', p, y: -TOP_OFFSET[n.kind] * s - 8, value: n.meter });
+      if (n.status === 'down') out.push({ key: `down:${n.id}`, kind: 'down', p, x: 52 * s, y: -44 * s });
+    }
+    return out;
+  }, [scene]);
+
+  const notes = useMemo(() => scene.notes ?? [], [scene]);
+
+  const nodeP = usePresence(sorted, nodeKey);
+  const linkP = usePresence(links, (l) => l.key);
+  const labelP = usePresence(linkLabels, (l) => l.key);
+  const overlayP = usePresence(overlays, (o) => o.key);
+  const noteP = usePresence(notes, (n) => `note:${n.text}:${n.at.join(',')}`);
+
   return (
     <svg
       className="scene"
@@ -200,7 +251,7 @@ export function SceneView({
       </defs>
 
       <g className="links">
-        {links.map(({ key, link, d }) => {
+        {linkP.map(({ key, item: { link, d }, exiting, order }) => {
           const tone = link.tone ?? (link.dashed ? 'muted' : 'ink');
           const arrow = link.arrow ?? 'end';
           return (
@@ -208,7 +259,8 @@ export function SceneView({
               key={key}
               d={d}
               pathLength={link.dashed ? undefined : 1}
-              className={`link link-${tone}${link.dashed ? ' dashed' : ' draw'}`}
+              style={stagger(order, 260, 45)}
+              className={`link link-${tone}${link.dashed ? ' dashed' : ' draw'}${exiting ? ' out' : ''}`}
               markerEnd={arrow !== 'none' ? `url(#arrow-${tone})` : undefined}
               markerStart={arrow === 'both' ? `url(#arrow-${tone})` : undefined}
             />
@@ -219,16 +271,14 @@ export function SceneView({
       <Packets flows={flows} paused={paused} resetKey={resetKey} />
 
       <g className="nodes">
-        {sorted.map((n) => {
-          const p = toScreen(n.at);
+        {nodeP.map(({ key, item: n, exiting, order }) => {
           const tone = n.status === 'down' ? 'gray' : n.tone ?? defaultTone(n);
+          const s = nodeScale(n);
           return (
-            <g key={n.id} transform={`translate(${p.x},${p.y})`}>
-              <g className={`node pop tone-${tone} status-${n.status ?? 'ok'}`}>
-                <ellipse className="ground" cx={0} cy={TAG_OFFSET[n.kind] * 0.55 * nodeScale(n)} rx={70 * nodeScale(n)} ry={18 * nodeScale(n)} />
-                {n.status === 'hot' && (
-                  <ellipse className="hot-ring" cx={0} cy={TAG_OFFSET[n.kind] * 0.45 * nodeScale(n)} rx={78 * nodeScale(n)} ry={34 * nodeScale(n)} />
-                )}
+            <g key={key} className="slide" style={at(toScreen(n.at))}>
+              <g className={`node tone-${tone} status-${n.status ?? 'ok'} ${exiting ? 'out' : 'pop'}`} style={stagger(order)}>
+                <ellipse className="ground" cx={0} cy={TAG_OFFSET[n.kind] * 0.55 * s} rx={70 * s} ry={18 * s} />
+                {n.status === 'hot' && <ellipse className="hot-ring" cx={0} cy={TAG_OFFSET[n.kind] * 0.45 * s} rx={78 * s} ry={34 * s} />}
                 <NodeShape n={n} />
               </g>
             </g>
@@ -237,33 +287,30 @@ export function SceneView({
       </g>
 
       <g className="labels">
-        {links
-          .filter((l) => l.link.label)
-          .map(({ key, link, mid }) => (
-            <g key={key} className="fade-in">
-              <Pill x={mid.x} y={mid.y} text={link.label!} size={11.5} tone={link.tone === 'bad' ? 'bad' : 'ink'} />
+        {labelP.map(({ key, item, exiting, order }) => (
+          <g key={key} className="slide" style={at(item.mid)}>
+            <g className={exiting ? 'out' : 'fade-in'} style={stagger(order, 380, 40)}>
+              <Pill x={0} y={0} text={item.text} size={11.5} tone={item.bad ? 'bad' : 'ink'} />
             </g>
-          ))}
-        {scene.nodes.map((n) => {
-          const p = toScreen(n.at);
-          const s = nodeScale(n);
-          const tag = n.tag ?? (n.kind !== 'cube' ? n.label : undefined);
-          return (
-            <g key={n.id} transform={`translate(${p.x},${p.y})`} className={`fade-in${n.status === 'dim' ? ' dim' : ''}`}>
-              {tag && <Pill x={0} y={TAG_OFFSET[n.kind] * s} text={tag} icon={n.tagIcon} size={12.5} bold />}
-              {n.meter !== undefined && <Meter x={0} y={-TOP_OFFSET[n.kind] * s - 8} value={n.meter} />}
-              {n.status === 'down' && <DownBadge x={52 * s} y={-44 * s} />}
+          </g>
+        ))}
+        {overlayP.map(({ key, item: o, exiting, order }) => (
+          <g key={key} className="slide" style={at(o.p)}>
+            <g
+              className={`${exiting ? 'out' : o.kind === 'down' ? 'pop' : 'fade-in'}${o.kind === 'tag' && o.dim ? ' dim' : ''}`}
+              style={stagger(order, 300, 45)}
+            >
+              {o.kind === 'tag' && <Pill x={0} y={o.y} text={o.text} icon={o.icon} size={12.5} bold />}
+              {o.kind === 'meter' && <Meter x={0} y={o.y} value={o.value} />}
+              {o.kind === 'down' && <DownBadge x={o.x} y={o.y} />}
             </g>
-          );
-        })}
-        {(scene.notes ?? []).map((note, i) => {
-          const p = toScreen(note.at);
-          return (
-            <g key={`${note.text}-${i}`} className="fade-in">
-              <Pill x={p.x} y={p.y} text={note.text} icon={note.icon} size={12} tone={note.tone ?? 'ink'} />
-            </g>
-          );
-        })}
+          </g>
+        ))}
+        {noteP.map(({ key, item: note, exiting, order }) => (
+          <g key={key} className={exiting ? 'out' : 'fade-in'} style={stagger(order, 450, 80)}>
+            <Pill x={toScreen(note.at).x} y={toScreen(note.at).y} text={note.text} icon={note.icon} size={12} tone={note.tone ?? 'ink'} />
+          </g>
+        ))}
       </g>
     </svg>
   );

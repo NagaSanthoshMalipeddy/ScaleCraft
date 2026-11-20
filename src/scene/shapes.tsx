@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Settings2, X } from 'lucide-react';
 import type { SceneNode } from '../types';
 import { nodeScale, roundedPath, rhombus, type Pt } from './geom';
+import { useTween } from './presence';
 
 const ISO_U = { x: 0.866, y: 0.5 };
 const ISO_V = { x: -0.866, y: 0.5 };
@@ -82,14 +83,16 @@ function Cube({ n, s }: { n: SceneNode; s: number }) {
         <path d={`M${h[5].x},${h[5].y} L0,0 L${h[1].x},${h[1].y} M0,0 L0,${S}`} className="inner" />
       </g>
       <path d={roundedPath(h, 12 * s)} className="ol" />
-      <Icon icon={n.icon} size={26 * s} x={0} y={(hasSub ? -22 : -16) * s} />
+      <g key={`i-${n.icon?.displayName ?? ''}`} className="swap">
+        <Icon icon={n.icon} size={26 * s} x={0} y={(hasSub ? -22 : -16) * s} />
+      </g>
       {n.label && (
-        <text className="node-label" x={0} y={(n.icon ? (hasSub ? 10 : 16) : hasSub ? 0 : 5) * s} fontSize={15 * s}>
+        <text key={`l-${n.label}`} className="node-label swap" x={0} y={(n.icon ? (hasSub ? 10 : 16) : hasSub ? 0 : 5) * s} fontSize={15 * s}>
           {n.label}
         </text>
       )}
       {n.sub && (
-        <text className="node-sub" x={0} y={(n.icon ? 27 : 18) * s} fontSize={11.5 * s}>
+        <text key={`s-${n.sub}`} className="node-sub swap" x={0} y={(n.icon ? 27 : 18) * s} fontSize={11.5 * s}>
           {n.sub}
         </text>
       )}
@@ -193,13 +196,17 @@ function Queue({ n, s }: { n: SceneNode; s: number }) {
       <polygon points={pts(top)} className="f1" />
       <path d={roundedPath(outline, 5)} className="ol" />
       <g className="tone-orange">
-        {Array.from({ length: shown }).map((_, i) => {
+        {Array.from({ length: 6 }).map((_, i) => {
           const p = add(o, ISO_U, a / 2 - 18 * s - i * step);
-          return <SmallCube key={i} s={14 * s} x={p.x} y={p.y - 10 * s} />;
+          return (
+            <g key={i} className={`slot${i < shown ? '' : ' off'}`} style={{ transitionDelay: `${i * 40}ms` }}>
+              <SmallCube s={14 * s} x={p.x} y={p.y - 10 * s} />
+            </g>
+          );
         })}
       </g>
       {items > 6 && (
-        <text className="node-sub strong" x={corner(-1, 0).x - 6} y={corner(-1, 0).y - 10} fontSize={13}>
+        <text key={items} className="node-sub strong swap" x={corner(-1, 0).x - 6} y={corner(-1, 0).y - 10} fontSize={13}>
           +{items - 6}
         </text>
       )}
@@ -210,7 +217,7 @@ function Queue({ n, s }: { n: SceneNode; s: number }) {
 function Crowd({ n, s }: { n: SceneNode; s: number }) {
   const hw = 70 * s;
   const people = Math.min(n.items ?? 5, 7);
-  const spots: Pt[] = [
+  const spots = [
     { x: 0, y: -14 },
     { x: -30, y: -2 },
     { x: 30, y: -2 },
@@ -219,16 +226,17 @@ function Crowd({ n, s }: { n: SceneNode; s: number }) {
     { x: 26, y: -22 },
     { x: 0, y: -34 },
   ]
-    .slice(0, people)
-    .sort((p, q) => p.y - q.y)
-    .map((p) => ({ x: p.x * s, y: p.y * s }));
+    .map((p, i) => ({ x: p.x * s, y: p.y * s, on: i < people, i }))
+    .sort((p, q) => p.y - q.y);
   return (
     <g>
       <Box hw={hw} hh={hw * 0.577} h={12 * s} cy={8 * s} r={8 * s} />
-      {spots.map((p, i) => (
-        <g key={i} transform={`translate(${p.x},${p.y})`} className="person">
-          <path d={`M${-11 * s},0 C${-11 * s},${-18 * s} ${11 * s},${-18 * s} ${11 * s},0 Z`} className="f1 ol thin" />
-          <circle cx={0} cy={-22 * s} r={7 * s} className="f1 ol thin" />
+      {spots.map((p) => (
+        <g key={p.i} transform={`translate(${p.x},${p.y})`}>
+          <g className={`person slot${p.on ? '' : ' off'}`} style={{ transitionDelay: `${p.i * 40}ms` }}>
+            <path d={`M${-11 * s},0 C${-11 * s},${-18 * s} ${11 * s},${-18 * s} ${11 * s},0 Z`} className="f1 ol thin" />
+            <circle cx={0} cy={-22 * s} r={7 * s} className="f1 ol thin" />
+          </g>
         </g>
       ))}
     </g>
@@ -304,7 +312,7 @@ export function Pill({
 }
 
 export function Meter({ x, y, value }: { x: number; y: number; value: number }) {
-  const v = Math.max(0, Math.min(100, value));
+  const v = Math.max(0, Math.min(100, useTween(value)));
   const w = 104;
   const h = 24;
   const cls = v >= 85 ? 'bad' : v >= 60 ? 'warn' : 'good';

@@ -160,6 +160,7 @@ export function LessonView({
           </div>
           <div className="scene-wrap">
             <SceneView
+              key={lesson.id}
               scene={step.scene}
               bounds={bounds}
               paused={paused}
