@@ -49,6 +49,7 @@ export function Header({
         <a href="#/questions" className={`top-tab${section === 'questions' ? ' on' : ''}`} aria-current={section === 'questions' ? 'page' : undefined}>
           <Target size={16} />
           <span>Questions</span>
+          <span className="new-badge" aria-label="new">New</span>
         </a>
       </nav>
       <div className="topbar-spacer" />
