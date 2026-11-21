@@ -5,9 +5,10 @@
 System design, animated. Each lesson starts with a real problem and adds one idea per step, while an isometric diagram shows traffic flowing, servers heating up and metrics changing.
 
 - **40 lessons · 9 modules · 313 animated steps** — Foundations, Scaling, Data & Storage, Communication, Reliability, Architecture, Security, Shipping, and Whole Systems capstones (URL shortener, news feed, chat).
+- **40 interview questions · 399 animated steps** — a separate [Questions](https://nagasanthoshmalipeddy.github.io/ScaleCraft/#/questions) section, grouped Beginner / Intermediate / Advanced and filterable by concept. Each walkthrough follows interview order (requirements → estimation → API & data model → design → deep dives → bottlenecks → recap), with likely follow-up questions and links to the lessons it builds on.
 - Step-by-step narrative panel with callouts, "what changed" lists and a "you'll learn" checklist.
 - Live metric chips, load meters, health badges and animated request/response packets.
-- Course drawer, `Ctrl`/`⌘` + `K` search across lessons and steps, light/dark theme.
+- Course / Questions tabs, `Ctrl`/`⌘` + `K` search across lessons, questions and every step, light/dark theme.
 - Progress and theme are stored in `localStorage` — nothing leaves your machine.
 
 ## Run it
@@ -18,7 +19,7 @@ npm run dev        # http://localhost:5173
 npm run build      # static site in dist/
 npm run preview    # serve the production build
 npm run lint
-npm run check:lessons  # layout checker for every lesson diagram
+npm run check:lessons  # layout checker for every lesson and question diagram
 ```
 
 ## Keyboard
@@ -31,7 +32,7 @@ npm run check:lessons  # layout checker for every lesson diagram
 | `Ctrl K` or `/` | search |
 | `Esc` | close menu / search |
 
-URLs are shareable: `#/<lesson-id>/<step>`, e.g. `#/caching/4`.
+URLs are shareable: `#/<lesson-id>/<step>`, e.g. `#/caching/4`; questions use `q-` ids, e.g. `#/q-ticket-booking/5`. The question bank is `#/questions`, and `#/questions/<Concept>` filters it, e.g. `#/questions/Consistency`.
 
 ## Deploy
 
@@ -52,6 +53,8 @@ React 19 + TypeScript + Vite, hand-drawn SVG, no chart or animation libraries.
 src/
   types.ts              Lesson / Step / Scene data model
   lessons/              Lesson content (pure data) + kit.ts authoring helpers
+  questions/            Interview question walkthroughs (same data model + concepts, follow-ups, related lessons)
+  catalog.ts            Unifies lessons and questions for routing, navigation and progress
   scene/
     geom.ts             Iso grid projection, link routing, path maths
     shapes.tsx          Cubes, cylinders, laptops, queues, crowds, pills, meters
@@ -86,5 +89,9 @@ steps: [{
 ```
 
 Grid positions are `[col, row]`; moving `(+1, +1)` or `(+1, -1)` follows the isometric axes, and links between nodes that aren't on a shared axis are routed with one iso-aligned bend. Add the lesson to a module in `src/lessons/index.ts`, then run `npm run check:lessons` — it flags overlapping nodes and labels, links that cut through nodes, dangling ids and over-long text.
+
+### Adding a question
+
+A `Question` is a `Lesson` plus `n` (its number), `concepts`, `followUps` and `related` lesson ids. Ids start with `q-`. Steps use the interview tags (`Requirements`, `Estimation`, `API`, `Data Model`, `Design`, `Deep Dive`, `Bottleneck`, `Recap`). Add it to `src/questions/index.ts`; the checker also validates numbering, follow-ups and that every `related` id exists.
 
 > Diagrams and timings are teaching examples — measure your own systems.

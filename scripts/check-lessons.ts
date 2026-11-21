@@ -1,15 +1,15 @@
 /**
- * Static layout checker for lesson scenes.
+ * Static layout checker for lesson and question scenes.
  *
- *   npx tsx scripts/check-lessons.ts                     # every lesson wired into src/lessons/index.ts
- *   npx tsx scripts/check-lessons.ts src/lessons/foo.ts  # every Lesson exported by the given file(s)
+ *   npx tsx scripts/check-lessons.ts                       # every lesson and question wired into the indexes
+ *   npx tsx scripts/check-lessons.ts src/questions/foo.ts  # every Lesson/Question exported by the given file(s)
  *
  * Reports overlapping nodes/labels, links that cut through other nodes, dangling ids and over-long text.
  * Exits with code 1 when any error is found.
  */
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Lesson, Scene, SceneNode } from '../src/types';
+import type { Lesson, Question, Scene, SceneNode } from '../src/types';
 import { nodeRadius, nodeScale, pointAt, polyLength, routeLink, toScreen, trim, type Pt } from '../src/scene/geom';
 import { sceneBounds, TAG_OFFSET, TOP_OFFSET } from '../src/scene/layout';
 
@@ -138,7 +138,7 @@ function checkScene(scene: Scene, where: string, errors: string[], warns: string
 function checkLesson(l: Lesson, errors: string[], warns: string[]) {
   const ids = new Set(l.metrics.map((m) => m.id));
   if (l.steps.length < 4) warns.push(`${l.id}: only ${l.steps.length} steps`);
-  if (l.steps[0]?.tag !== 'Problem') warns.push(`${l.id}: first step should be tagged Problem`);
+  if (l.steps[0]?.tag !== 'Problem' && l.steps[0]?.tag !== 'Requirements') warns.push(`${l.id}: first step should be tagged Problem or Requirements`);
   if (l.steps[l.steps.length - 1]?.tag !== 'Recap') warns.push(`${l.id}: last step should be tagged Recap`);
   for (const it of l.learn) if (it.at >= l.steps.length) errors.push(`${l.id}: learn item "${it.text}" has at=${it.at} beyond last step`);
   l.steps.forEach((s, i) => {
@@ -156,12 +156,30 @@ function checkLesson(l: Lesson, errors: string[], warns: string[]) {
   if (b.h > 760) warns.push(`${l.id}: scene is ${Math.round(b.h)} units tall (> 760) — diagram will render small; tighten the layout`);
 }
 
+const isQuestion = (l: Lesson): l is Question => 'n' in l && 'concepts' in l;
+
+function checkQuestion(q: Question, lessonIds: Set<string>, errors: string[], warns: string[]) {
+  if (!q.id.startsWith('q-')) errors.push(`${q.id}: question ids must start with "q-"`);
+  if (!Number.isInteger(q.n) || q.n < 1) errors.push(`${q.id}: n must be a positive integer`);
+  if (!q.concepts?.length) errors.push(`${q.id}: concepts must not be empty`);
+  if (!q.followUps || q.followUps.length < 3 || q.followUps.length > 5) errors.push(`${q.id}: followUps should have 3–5 items`);
+  q.followUps?.forEach((f) => f.length > 110 && warns.push(`${q.id}: follow-up is ${f.length} chars (keep ≤ 110): "${f.slice(0, 40)}…"`));
+  if (!q.related?.length) warns.push(`${q.id}: no related lessons`);
+  for (const r of q.related ?? []) if (!lessonIds.has(r)) errors.push(`${q.id}: related lesson "${r}" does not exist`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const lessons: Lesson[] = [];
+  const course = await import(pathToFileURL(path.resolve('src/lessons/index.ts')).href);
+  const lessonIds = new Set<string>(course.modules.flatMap((m: { lessons: Lesson[] }) => m.lessons.map((l) => l.id)));
   if (args.length === 0) {
-    const mod = await import(pathToFileURL(path.resolve('src/lessons/index.ts')).href);
-    for (const m of mod.modules) lessons.push(...m.lessons);
+    for (const m of course.modules) lessons.push(...m.lessons);
+    const bank = await import(pathToFileURL(path.resolve('src/questions/index.ts')).href);
+    lessons.push(...bank.questions);
+    const nums = bank.questions.map((q: Question) => q.n);
+    const dupN = nums.filter((n: number, i: number) => nums.indexOf(n) !== i);
+    if (dupN.length) console.log(`✗ duplicate question numbers: ${dupN.join(', ')}`);
   } else {
     for (const a of args) {
       const mod = await import(pathToFileURL(path.resolve(a)).href);
@@ -176,13 +194,15 @@ async function main() {
     const errors: string[] = [];
     const warns: string[] = [];
     checkLesson(l, errors, warns);
+    if (isQuestion(l)) checkQuestion(l, lessonIds, errors, warns);
     errorCount += errors.length;
     const b = sceneBounds(l.steps.map((s) => s.scene));
     console.log(`${errors.length ? '✗' : '✓'} ${l.id} — ${l.steps.length} steps, scene ${Math.round(b.w)}×${Math.round(b.h)}`);
     for (const e of errors) console.log(`   ERROR ${e}`);
     for (const w of warns) console.log(`   warn  ${w}`);
   }
-  console.log(`\n${lessons.length} lessons, ${errorCount} errors`);
+  const qCount = lessons.filter(isQuestion).length;
+  console.log(`\n${lessons.length - qCount} lessons, ${qCount} questions, ${errorCount} errors`);
   process.exit(errorCount ? 1 : 0);
 }
 

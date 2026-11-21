@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { findEntry, firstLesson, isComplete } from './catalog';
 import { Header } from './components/Header';
 import { LessonView } from './components/LessonView';
 import { Outline } from './components/Outline';
+import { QuestionBank } from './components/QuestionBank';
 import { SearchModal } from './components/SearchModal';
 import { Sidebar } from './components/Sidebar';
-import { lastVisited, rememberLast, useHashRoute, useMotion, useProgress, useTheme } from './hooks/state';
-import { allLessons, findLesson } from './lessons';
+import { lastVisited, questionsHref, rememberLast, useHashRoute, useMotion, useProgress, useTheme } from './hooks/state';
+import { allLessons } from './lessons';
+import { questions } from './questions';
 
 export default function App() {
   const [route, go] = useHashRoute();
@@ -14,20 +17,31 @@ export default function App() {
   const [progress, mark, resetProgress] = useProgress();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const outlineRef = useRef<HTMLElement>(null);
+  const belowRef = useRef<HTMLElement>(null);
 
-  const routed = route.lessonId ? findLesson(route.lessonId) : undefined;
+  const onBankPage = route.lessonId === 'questions';
+  const concept = onBankPage && route.arg ? route.arg : null;
+
+  const routed = route.lessonId && !onBankPage ? findEntry(route.lessonId) : undefined;
   const fallback = lastVisited();
-  const resumed = !routed && fallback ? findLesson(fallback.lessonId) : undefined;
-  const lref = routed ?? resumed ?? allLessons[0];
+  const resumed = !routed && !onBankPage && fallback ? findEntry(fallback.lessonId) : undefined;
+  const entry = routed ?? resumed ?? firstLesson;
   const wanted = routed ? route.step : resumed ? fallback!.step : 1;
-  const stepIndex = Math.max(0, Math.min(lref.lesson.steps.length - 1, wanted - 1));
+  const stepIndex = Math.max(0, Math.min(entry.lesson.steps.length - 1, wanted - 1));
+  const section = onBankPage || entry.kind === 'question' ? 'questions' : 'course';
+
+  const lastLesson = lastVisited('lesson');
+  const courseHref = lastLesson && findEntry(lastLesson.lessonId) ? `#/${lastLesson.lessonId}/${lastLesson.step}` : `#/${firstLesson.lesson.id}/1`;
 
   useEffect(() => {
-    mark(lref.lesson.id, stepIndex);
-    rememberLast(lref.lesson.id, stepIndex + 1);
-    document.title = `${lref.lesson.title} · Scalecraft`;
-  }, [lref.lesson.id, lref.lesson.title, stepIndex, mark]);
+    if (onBankPage) {
+      document.title = `${concept ? `${concept} · ` : ''}System Design Questions · Scalecraft`;
+      return;
+    }
+    mark(entry.lesson.id, stepIndex);
+    rememberLast(entry.lesson.id, stepIndex + 1);
+    document.title = `${entry.question ? `Q${entry.question.n}: ` : ''}${entry.lesson.title} · Scalecraft`;
+  }, [onBankPage, concept, entry.lesson.id, entry.lesson.title, entry.question, stepIndex, mark]);
 
   useEffect(() => {
     if (route.lessonId) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -50,11 +64,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [searchOpen]);
 
-  const showOutline = useCallback(() => {
-    outlineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const showBelow = useCallback(() => {
+    belowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
 
-  const done = allLessons.filter((r) => (progress[r.lesson.id] ?? -1) >= r.lesson.steps.length - 1).length;
+  const pool = section === 'questions' ? questions : allLessons.map((r) => r.lesson);
+  const done = pool.filter((l) => isComplete(l, progress)).length;
 
   return (
     <div className="app">
@@ -66,13 +81,42 @@ export default function App() {
         onMenu={() => setMenuOpen((o) => !o)}
         menuOpen={menuOpen}
         onSearch={() => setSearchOpen(true)}
-        onOutline={showOutline}
+        onOutline={showBelow}
+        section={section}
+        courseHref={courseHref}
         done={done}
-        total={allLessons.length}
+        total={pool.length}
       />
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} currentId={lref.lesson.id} progress={progress} onReset={resetProgress} />
-      <LessonView lref={lref} stepIndex={stepIndex} go={go} blocked={searchOpen || menuOpen} />
-      <Outline ref={outlineRef} progress={progress} currentId={lref.lesson.id} />
+      <Sidebar
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        currentId={onBankPage ? '' : entry.lesson.id}
+        section={section}
+        progress={progress}
+        onReset={resetProgress}
+      />
+      {onBankPage ? (
+        <QuestionBank ref={belowRef} variant="page" progress={progress} concept={concept} />
+      ) : (
+        <>
+          <LessonView
+            entry={entry}
+            stepIndex={stepIndex}
+            go={go}
+            blocked={searchOpen || menuOpen}
+            onConcept={(c) => (window.location.hash = questionsHref(c))}
+          />
+          {entry.kind === 'question' ? (
+            <QuestionBank ref={belowRef} variant="below" progress={progress} concept={null} currentId={entry.lesson.id} />
+          ) : (
+            <Outline ref={belowRef} progress={progress} currentId={entry.lesson.id} />
+          )}
+        </>
+      )}
+      <footer className="site-foot">
+        <span>Scalecraft · built locally with React + SVG</span>
+        <span className="muted">Diagrams and timings are teaching examples — measure your own systems.</span>
+      </footer>
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} onGo={go} />
     </div>
   );

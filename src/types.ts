@@ -83,7 +83,21 @@ export interface Scene {
   notes?: SceneNote[];
 }
 
-export type StepTag = 'Problem' | 'Technique' | 'Trade-off' | 'Case' | 'Insight' | 'Recap';
+export type StepTag =
+  | 'Problem'
+  | 'Technique'
+  | 'Trade-off'
+  | 'Case'
+  | 'Insight'
+  | 'Recap'
+  // Interview-style question walkthroughs
+  | 'Requirements'
+  | 'Estimation'
+  | 'API'
+  | 'Data Model'
+  | 'Design'
+  | 'Deep Dive'
+  | 'Bottleneck';
 
 export interface Callout {
   kind: 'key' | 'tip' | 'warn';
@@ -137,4 +151,16 @@ export interface Module {
   id: string;
   title: string;
   lessons: Lesson[];
+}
+
+/** An interview-style design walkthrough in the question bank. Rendered with the same player as lessons. */
+export interface Question extends Lesson {
+  /** Position in the question bank (1-based). */
+  n: number;
+  /** Concepts the question exercises, shown as filterable chips. */
+  concepts: string[];
+  /** Ids of course lessons that teach the building blocks. */
+  related: string[];
+  /** Follow-ups an interviewer is likely to ask. */
+  followUps: string[];
 }

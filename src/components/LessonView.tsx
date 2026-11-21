@@ -6,7 +6,9 @@ import {
   Clock,
   Keyboard,
   Lightbulb,
+  BookOpen,
   ListOrdered,
+  MessageCircleQuestion,
   Pause,
   Play,
   RotateCcw,
@@ -14,7 +16,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { allLessons, type LessonRef } from '../lessons';
+import { lessonById, type Entry } from '../catalog';
 import { sceneBounds, usedFlowKinds } from '../scene/layout';
 import { SceneView } from '../scene/Scene';
 import type { Callout, FlowKind } from '../types';
@@ -48,17 +50,21 @@ function CalloutBox({ c }: { c: Callout }) {
 }
 
 export function LessonView({
-  lref,
+  entry,
   stepIndex,
   go,
   blocked,
+  onConcept,
 }: {
-  lref: LessonRef;
+  entry: Entry;
   stepIndex: number;
   go: (lessonId: string, step?: number) => void;
   blocked: boolean;
+  /** Open the question bank filtered to a concept. */
+  onConcept?: (concept: string) => void;
 }) {
-  const { lesson, module, moduleIndex, indexInModule } = lref;
+  const { lesson, question, next } = entry;
+  const isQuestion = entry.kind === 'question';
   const step = lesson.steps[stepIndex];
   const total = lesson.steps.length;
   const stepKey = `${lesson.id}-${stepIndex}`;
@@ -76,11 +82,10 @@ export function LessonView({
     return merged;
   }, [lesson, stepIndex]);
 
-  const next = allLessons[lref.globalIndex + 1];
   const goStep = (i: number) => go(lesson.id, Math.max(1, Math.min(total, i + 1)));
   const onNext = () => {
     if (stepIndex < total - 1) goStep(stepIndex + 1);
-    else if (next) go(next.lesson.id, 1);
+    else if (next) go(next.id, 1);
   };
   const onBack = () => stepIndex > 0 && goStep(stepIndex - 1);
 
@@ -108,28 +113,38 @@ export function LessonView({
   });
 
   const kinds = usedFlowKinds(step.scene);
-  const nextLabel = stepIndex < total - 1 ? `Next: ${lesson.steps[stepIndex + 1].short}` : next ? `Next lesson: ${next.lesson.title}` : 'Course complete';
+  const nextLabel =
+    stepIndex < total - 1
+      ? `Next: ${lesson.steps[stepIndex + 1].short}`
+      : next
+        ? `${isQuestion ? 'Next question' : 'Next lesson'}: ${next.title}`
+        : isQuestion
+          ? 'All questions done'
+          : 'Course complete';
+  const related = (question?.related ?? []).map((id) => ({ id, lesson: lessonById(id) })).filter((r) => r.lesson);
 
   return (
     <div className="lesson-layout">
       <main className="lesson-main card">
         <div className="lesson-head">
           <div className="crumbs">
-            <span>
-              {String(moduleIndex + 1).padStart(2, '0')}. {module.title}
-            </span>
-            <span className="sep">/</span>
-            <span>
-              Lesson {indexInModule + 1} of {module.lessons.length}
-            </span>
+            {entry.crumbs.map((c, i) => (
+              <span key={i} className="crumb">
+                {i > 0 && <span className="sep">/</span>}
+                {isQuestion && i === 0 ? <a href="#/questions">{c}</a> : c}
+              </span>
+            ))}
           </div>
           <div className="title-row">
-            <h2>{lesson.title}</h2>
+            <h2>
+              {question && <span className="q-num">#{question.n}</span>}
+              {lesson.title}
+            </h2>
             <div className="chips">
               <span className="chip chip-sand">
                 <Clock size={15} /> {lesson.minutes} min
               </span>
-              <span className="chip chip-green">
+              <span className={`chip ${isQuestion ? `chip-level level-${lesson.level.toLowerCase()}` : 'chip-green'}`}>
                 <BarChart3 size={15} /> {lesson.level}
               </span>
               <span className="chip chip-violet">
@@ -138,6 +153,16 @@ export function LessonView({
             </div>
           </div>
           <p className="blurb">{lesson.blurb}</p>
+          {question && (
+            <div className="concept-row" aria-label="Key concepts">
+              <span className="eyebrow">Key concepts</span>
+              {question.concepts.map((c) => (
+                <button key={c} className="concept" onClick={() => onConcept?.(c)} title={`Questions that exercise ${c}`}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <section className="stage" aria-label="Animated diagram">
@@ -192,9 +217,9 @@ export function LessonView({
           </div>
         </section>
 
-        <section className="stepper card-inner" aria-label="Steps in this lesson">
+        <section className="stepper card-inner" aria-label={isQuestion ? 'Steps in this walkthrough' : 'Steps in this lesson'}>
           <div className="stepper-head">
-            <span className="eyebrow strong">In this lesson</span>
+            <span className="eyebrow strong">{isQuestion ? 'Walkthrough' : 'In this lesson'}</span>
             <span className="muted">
               Step {stepIndex + 1} of {total}
             </span>
@@ -278,6 +303,37 @@ export function LessonView({
             })}
           </ul>
         </div>
+
+        {question && question.followUps.length > 0 && (
+          <div className="card learn-card followups-card">
+            <div className="eyebrow strong">
+              <MessageCircleQuestion size={15} /> Interviewers often ask
+            </div>
+            <ol>
+              {question.followUps.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {related.length > 0 && (
+          <div className="card learn-card related-card">
+            <div className="eyebrow strong">
+              <BookOpen size={15} /> Brush up first
+            </div>
+            <ul>
+              {related.map((r) => (
+                <li key={r.id}>
+                  <a href={`#/${r.id}/1`}>
+                    <span>{r.lesson!.title}</span>
+                    <ArrowRight size={14} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </aside>
     </div>
   );

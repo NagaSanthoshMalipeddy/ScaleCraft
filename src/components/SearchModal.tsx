@@ -1,10 +1,12 @@
-import { BookOpen, CornerDownLeft, Footprints, Search } from 'lucide-react';
+import { BookOpen, CornerDownLeft, Footprints, Search, Target } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { allLessons } from '../lessons';
+import { questions } from '../questions';
 import { plain } from '../text';
+import type { Lesson } from '../types';
 
 interface Entry {
-  kind: 'lesson' | 'step';
+  kind: 'lesson' | 'question' | 'step';
   title: string;
   context: string;
   haystack: string;
@@ -12,24 +14,40 @@ interface Entry {
   step: number;
 }
 
-const entries: Entry[] = allLessons.flatMap(({ lesson, module, moduleIndex }) => [
-  {
-    kind: 'lesson' as const,
-    title: lesson.title,
-    context: `${String(moduleIndex + 1).padStart(2, '0')}. ${module.title} · ${lesson.blurb}`,
-    haystack: [lesson.title, lesson.blurb, module.title, ...(lesson.keywords ?? [])].join(' ').toLowerCase(),
-    lessonId: lesson.id,
-    step: 1,
-  },
-  ...lesson.steps.map((s, i) => ({
+const stepEntries = (lesson: Lesson, label: string): Entry[] =>
+  lesson.steps.map((s, i) => ({
     kind: 'step' as const,
     title: s.title,
-    context: `${lesson.title} · Step ${i + 1} · ${s.tag}`,
+    context: `${label} · Step ${i + 1} · ${s.tag}`,
     haystack: [s.title, s.short, ...s.body.map(plain), s.callout?.text ?? ''].join(' ').toLowerCase(),
     lessonId: lesson.id,
     step: i + 1,
-  })),
-]);
+  }));
+
+const entries: Entry[] = [
+  ...allLessons.flatMap(({ lesson, module, moduleIndex }) => [
+    {
+      kind: 'lesson' as const,
+      title: lesson.title,
+      context: `${String(moduleIndex + 1).padStart(2, '0')}. ${module.title} · ${lesson.blurb}`,
+      haystack: [lesson.title, lesson.blurb, module.title, ...(lesson.keywords ?? [])].join(' ').toLowerCase(),
+      lessonId: lesson.id,
+      step: 1,
+    },
+    ...stepEntries(lesson, lesson.title),
+  ]),
+  ...questions.flatMap((q) => [
+    {
+      kind: 'question' as const,
+      title: q.title,
+      context: `Question ${q.n} · ${q.level} · ${q.concepts.join(', ')}`,
+      haystack: [q.title, q.blurb, q.level, 'question interview', ...q.concepts, ...q.followUps, ...(q.keywords ?? [])].join(' ').toLowerCase(),
+      lessonId: q.id,
+      step: 1,
+    },
+    ...stepEntries(q, `Q${q.n} ${q.title}`),
+  ]),
+];
 
 function score(e: Entry, terms: string[]): number {
   let total = 0;
@@ -41,7 +59,7 @@ function score(e: Entry, terms: string[]): number {
     else if (e.haystack.includes(term) || e.haystack.includes(stem)) total += 1;
     else return 0;
   }
-  return total + (e.kind === 'lesson' ? 1.5 : 0);
+  return total + (e.kind === 'step' ? 0 : 1.5);
 }
 
 export function SearchModal({ open, onClose, onGo }: { open: boolean; onClose: () => void; onGo: (lessonId: string, step: number) => void }) {
@@ -56,7 +74,7 @@ function SearchDialog({ onClose, onGo }: { onClose: () => void; onGo: (lessonId:
 
   const results = useMemo(() => {
     const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-    if (!terms.length) return entries.filter((e) => e.kind === 'lesson');
+    if (!terms.length) return entries.filter((e) => e.kind !== 'step');
     return entries
       .map((e) => ({ e, s: score(e, terms) }))
       .filter((r) => r.s > 0)
@@ -82,7 +100,7 @@ function SearchDialog({ onClose, onGo }: { onClose: () => void; onGo: (lessonId:
           <input
             autoFocus
             value={q}
-            placeholder="Search lessons, steps & concepts…"
+            placeholder="Search lessons, questions & concepts…"
             onChange={(e) => {
               setQ(e.target.value);
               setSel(0);
@@ -115,7 +133,9 @@ function SearchDialog({ onClose, onGo }: { onClose: () => void; onGo: (lessonId:
               onMouseEnter={() => setSel(i)}
               onClick={() => pick(e)}
             >
-              <span className={`sr-icon ${e.kind}`}>{e.kind === 'lesson' ? <BookOpen size={15} /> : <Footprints size={15} />}</span>
+              <span className={`sr-icon ${e.kind}`}>
+                {e.kind === 'lesson' ? <BookOpen size={15} /> : e.kind === 'question' ? <Target size={15} /> : <Footprints size={15} />}
+              </span>
               <span className="sr-text">
                 <span className="sr-title">{e.title}</span>
                 <span className="sr-ctx">{e.context}</span>

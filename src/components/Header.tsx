@@ -1,4 +1,4 @@
-import { BookOpenText, Menu, Moon, Sparkles, Search, Sun } from 'lucide-react';
+import { BookOpenText, GraduationCap, Menu, Moon, Sparkles, Search, Sun, Target } from 'lucide-react';
 import { Logo } from './Logo';
 
 export function Header({
@@ -10,6 +10,8 @@ export function Header({
   menuOpen,
   onSearch,
   onOutline,
+  section,
+  courseHref,
   done,
   total,
 }: {
@@ -21,6 +23,9 @@ export function Header({
   menuOpen: boolean;
   onSearch: () => void;
   onOutline: () => void;
+  section: 'course' | 'questions';
+  courseHref: string;
+  /** Completed / total for the active section. */
   done: number;
   total: number;
 }) {
@@ -36,19 +41,34 @@ export function Header({
           Scale<span className="hl">craft</span>
         </h1>
       </a>
+      <nav className="top-tabs" aria-label="Sections">
+        <a href={courseHref} className={`top-tab${section === 'course' ? ' on' : ''}`} aria-current={section === 'course' ? 'page' : undefined}>
+          <GraduationCap size={16} />
+          <span>Course</span>
+        </a>
+        <a href="#/questions" className={`top-tab${section === 'questions' ? ' on' : ''}`} aria-current={section === 'questions' ? 'page' : undefined}>
+          <Target size={16} />
+          <span>Questions</span>
+        </a>
+      </nav>
       <div className="topbar-spacer" />
-      <button className="search-btn" onClick={onSearch} aria-label="Search the course">
+      <button className="search-btn" onClick={onSearch} aria-label="Search lessons and questions">
         <Search size={17} />
-        <span className="search-ph">Search lessons & concepts…</span>
+        <span className="search-ph">Search lessons & questions…</span>
         <kbd>{isMac ? '⌘' : 'Ctrl'} K</kbd>
       </button>
-      <div className="progress-pill" title="Lessons completed">
+      <div className="progress-pill" title={section === 'questions' ? 'Questions completed' : 'Lessons completed'}>
         <span className="progress-ring" style={{ ['--p' as string]: `${total ? (done / total) * 100 : 0}%` }} />
         <span>
           {done}/{total}
         </span>
       </div>
-      <button className="icon-btn outline-btn" onClick={onOutline} aria-label="Course outline" title="Course outline">
+      <button
+        className="icon-btn outline-btn"
+        onClick={onOutline}
+        aria-label={section === 'questions' ? 'Question list' : 'Course outline'}
+        title={section === 'questions' ? 'Question list' : 'Course outline'}
+      >
         <BookOpenText size={18} />
       </button>
       <button

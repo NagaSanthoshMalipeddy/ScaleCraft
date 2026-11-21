@@ -1,7 +1,8 @@
-import { ArrowUpRight, Check } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Check, Target } from 'lucide-react';
 import { forwardRef } from 'react';
 import type { Progress } from '../hooks/state';
 import { allLessons, modules } from '../lessons';
+import { questions } from '../questions';
 
 export const Outline = forwardRef<HTMLElement, { progress: Progress; currentId: string }>(function Outline({ progress, currentId }, ref) {
   const totalSteps = allLessons.reduce((a, r) => a + r.lesson.steps.length, 0);
@@ -61,10 +62,19 @@ export const Outline = forwardRef<HTMLElement, { progress: Progress; currentId: 
           </div>
         ))}
       </div>
-      <footer className="site-foot">
-        <span>Scalecraft · built locally with React + SVG</span>
-        <span className="muted">Diagrams and timings are teaching examples — measure your own systems.</span>
-      </footer>
+      {questions.length > 0 && (
+        <a className="practice-cta card" href="#/questions">
+          <span className="practice-icon">
+            <Target size={22} />
+          </span>
+          <span className="practice-text">
+            <span className="eyebrow strong">Ready to practise?</span>
+            <span className="practice-title">{questions.length} system design interview questions</span>
+            <span className="muted">From a URL shortener to a multi-region platform — each one an animated, step-by-step walkthrough.</span>
+          </span>
+          <ArrowRight size={20} className="practice-arrow" />
+        </a>
+      )}
     </section>
   );
 });

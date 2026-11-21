@@ -3,13 +3,23 @@ import { useCallback, useEffect, useState } from 'react';
 export interface Route {
   lessonId: string | null;
   step: number;
+  /** Raw second segment (e.g. the concept filter in `#/questions/Caching`). */
+  arg?: string;
 }
 
 function parseHash(): Route {
   const parts = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
   const step = Math.max(1, parseInt(parts[1] ?? '1', 10) || 1);
-  return { lessonId: parts[0] ?? null, step };
+  let arg: string | undefined;
+  try {
+    arg = parts[1] !== undefined ? decodeURIComponent(parts[1]) : undefined;
+  } catch {
+    arg = parts[1];
+  }
+  return { lessonId: parts[0] ?? null, step, arg };
 }
+
+export const questionsHref = (concept?: string | null) => (concept ? `#/questions/${encodeURIComponent(concept)}` : '#/questions');
 
 export function useHashRoute(): [Route, (lessonId: string, step?: number) => void] {
   const [route, setRoute] = useState<Route>(parseHash);
@@ -95,14 +105,16 @@ export function useProgress(): [Progress, (lessonId: string, stepIndex: number) 
 export function rememberLast(lessonId: string, step: number) {
   try {
     localStorage.setItem(LAST_KEY, JSON.stringify({ lessonId, step }));
+    // The "Course" tab resumes the last lesson, not the last question.
+    if (!lessonId.startsWith('q-')) localStorage.setItem(LAST_KEY + '.lesson', JSON.stringify({ lessonId, step }));
   } catch {
     /* storage unavailable */
   }
 }
 
-export function lastVisited(): { lessonId: string; step: number } | null {
+export function lastVisited(kind: 'any' | 'lesson' = 'any'): { lessonId: string; step: number } | null {
   try {
-    return JSON.parse(localStorage.getItem(LAST_KEY) ?? 'null');
+    return JSON.parse(localStorage.getItem(kind === 'lesson' ? LAST_KEY + '.lesson' : LAST_KEY) ?? 'null');
   } catch {
     return null;
   }
